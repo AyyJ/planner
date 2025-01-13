@@ -50,15 +50,25 @@ struct LoginView: View {
                 }
             }
             .padding()
-            .alert("Error", isPresented: .constant(viewModel.error != nil)) {
-                Button("OK") {
-                    viewModel.error = nil
+            .alert(
+                "Error",
+                isPresented: Binding(
+                    get: { viewModel.error != nil },
+                    set: { if !$0 { viewModel.error = nil } }
+                ),
+                actions: {
+                    Button("OK") {
+                        viewModel.error = nil
+                    }
+                },
+                message: {
+                    if let error = viewModel.error as? APIError {
+                        Text(error.userMessage)
+                    } else {
+                        Text(viewModel.error?.localizedDescription ?? "Unknown error")
+                    }
                 }
-            } message: {
-                if let error = viewModel.error {
-                    Text(error.localizedDescription)
-                }
-            }
+            )
             .sheet(isPresented: $isRegistering) {
                 RegistrationView()
             }

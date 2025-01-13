@@ -1,8 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
-const bcrypt = require('bcryptjs');  // for password hashing
-const jwt = require('jsonwebtoken');  // for JWT tokens
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const connectDB = require('./config/database');
 const User = require('./models/User');
 const Artist = require('./models/Artist');
@@ -59,7 +59,8 @@ app.post('/api/v1/auth/register', async (req, res) => {
         // Create user
         const user = await User.create({
             username,
-            password: hashedPassword
+            password: hashedPassword,
+            artistPreferences: {}
         });
 
         // Generate token
@@ -113,9 +114,26 @@ app.post('/api/v1/auth/login', async (req, res) => {
 // Artist Routes
 app.get('/api/v1/artists', authenticateToken, async (req, res) => {
     try {
-        const artists = await Artist.find();
-        res.json(artists);
+        const artists = await Artist.find({}, {
+            _id: 1,          // Include MongoDB _id
+            name: 1,
+            imageURL: 1,
+            genre: 1,
+            stage: 1
+        });
+
+        // Transform data to match Swift model
+        const formattedArtists = artists.map(artist => ({
+            id: artist._id.toString(),  // Convert MongoDB _id to string
+            name: artist.name,
+            imageURL: artist.imageURL,
+            genre: artist.genre,
+            stage: artist.stage
+        }));
+
+        res.json(formattedArtists);
     } catch (error) {
+        console.error('Error fetching artists:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -136,8 +154,13 @@ app.post('/api/v1/artists/:artistId/preference', authenticateToken, async (req, 
         user.artistPreferences.set(artistId, interestLevel);
         await user.save();
 
-        res.json(user);
+        res.json({
+            id: user._id,
+            username: user.username,
+            artistPreferences: Object.fromEntries(user.artistPreferences)
+        });
     } catch (error) {
+        console.error('Error updating preference:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });

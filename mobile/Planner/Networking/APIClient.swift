@@ -19,12 +19,14 @@ class APIClient {
     // MARK: - Configuration
     private struct APIConfig {
         static let baseURL = "http://localhost:3000/api/v1"
+        static let timeout: TimeInterval = 30
         
         enum Endpoints {
             static let login = "/auth/login"
             static let register = "/auth/register"
             static let logout = "/auth/logout"
             static let artists = "/artists"
+            static let artistPreference = "/artists/%@/preference" // %@ will be replaced with artistId
         }
     }
     
@@ -34,46 +36,88 @@ class APIClient {
         method: String = "GET",
         body: [String: Any]? = nil
     ) async throws -> T {
+        APILogger.log(.debug, "Starting \(method) request to \(endpoint)")
+        
         guard let url = URL(string: APIConfig.baseURL + endpoint) else {
+            APILogger.log(.error, "Invalid URL: \(APIConfig.baseURL + endpoint)")
             throw APIError.invalidURL
         }
         
         var request = URLRequest(url: url)
         request.httpMethod = method
+        request.timeoutInterval = APIConfig.timeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         if let token = authToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            APILogger.log(.debug, "Added auth token to request")
         }
         
         if let body = body {
-            let jsonData = try JSONSerialization.data(withJSONObject: body)
-            request.httpBody = jsonData
-        }
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.networkError
-        }
-        
-        switch httpResponse.statusCode {
-        case 200...299:
             do {
-                return try JSONDecoder().decode(T.self, from: data)
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+                APILogger.log(.debug, "Request body: \(body)")
             } catch {
-                print("Decoding error: \(error)")
-                throw APIError.decodingError
+                APILogger.log(.error, "Failed to serialize request body", error: error)
+                throw APIError.unknown(error)
             }
-        case 401:
-            throw APIError.unauthorized
-        case 400...499:
-            let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data)
-            throw APIError.serverError(message: errorResponse?.message ?? "Client error")
-        case 500...599:
-            throw APIError.serverError(message: "Server error")
-        default:
-            throw APIError.unknown
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                APILogger.log(.error, "Invalid response type")
+                throw APIError.serverUnreachable
+            }
+            
+            // Log response details
+            APILogger.log(.info, """
+                Response received:
+                Status Code: \(httpResponse.statusCode)
+                Headers: \(httpResponse.allHeaderFields)
+                Data length: \(data.count) bytes
+                """)
+            
+            // Log response body in debug builds
+            #if DEBUG
+            if let jsonString = String(data: data, encoding: .utf8) {
+                APILogger.log(.debug, "Response body: \(jsonString)")
+            }
+            #endif
+            
+            switch httpResponse.statusCode {
+            case 200...299:
+                do {
+                    let decoder = JSONDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    return try decoder.decode(T.self, from: data)
+                } catch {
+                    APILogger.log(.error, "Decoding error", error: error)
+                    throw APIError.decodingError(error)
+                }
+            case 401:
+                throw APIError.unauthorized
+            case 400...499:
+                let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data)
+                throw APIError.serverError(message: errorResponse?.message ?? "Client error")
+            case 500...599:
+                throw APIError.serverError(message: "Server error")
+            default:
+                throw APIError.unknown(URLError(.badServerResponse))
+            }
+            
+        } catch let urlError as URLError {
+            APILogger.log(.error, "Network error", error: urlError)
+            
+            if urlError.code == .cannotConnectToHost {
+                throw APIError.serverUnreachable
+            }
+            throw APIError.networkError(urlError)
+            
+        } catch {
+            APILogger.log(.error, "Unknown error", error: error)
+            throw APIError.unknown(error)
         }
     }
     
@@ -139,31 +183,5 @@ class APIClient {
             method: "POST",
             body: body
         )
-    }
-}
-
-enum APIError: Error {
-    case invalidURL
-    case networkError
-    case decodingError
-    case unauthorized
-    case serverError(message: String)
-    case unknown
-    
-    var userMessage: String {
-        switch self {
-        case .invalidURL:
-            return "Invalid request"
-        case .networkError:
-            return "Network error. Please check your connection"
-        case .decodingError:
-            return "Error processing server response"
-        case .unauthorized:
-            return "Please log in again"
-        case .serverError(let message):
-            return message
-        case .unknown:
-            return "An unexpected error occurred"
-        }
     }
 }

@@ -32,6 +32,25 @@ struct ProfileView: View {
                     }
                 }
             }
+            .alert(
+                "Error",
+                isPresented: Binding(
+                    get: { authViewModel.error != nil },
+                    set: { if !$0 { authViewModel.error = nil } }
+                ),
+                actions: {
+                    Button("OK") {
+                        authViewModel.error = nil
+                    }
+                },
+                message: {
+                    if let error = authViewModel.error as? APIError {
+                        Text(error.userMessage)
+                    } else {
+                        Text(authViewModel.error?.localizedDescription ?? "Unknown error")
+                    }
+                }
+            )
             .navigationTitle("Profile")
             .confirmationDialog(
                 "Are you sure you want to logout?",

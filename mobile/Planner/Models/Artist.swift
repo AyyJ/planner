@@ -12,4 +12,5 @@ struct Artist: Identifiable, Codable {
     let name: String
     let imageURL: String?
     let genre: String
+    let stage: Stage
 }

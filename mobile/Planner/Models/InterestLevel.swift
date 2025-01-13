@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum InterestLevel: String, Codable {
+enum InterestLevel: String, Codable, CaseIterable {
     case wouldSee = "Would See"
     case wantToSee = "Want to See"
     case mustSee = "Must See"

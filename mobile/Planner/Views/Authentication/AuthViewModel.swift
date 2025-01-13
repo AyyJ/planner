@@ -11,7 +11,7 @@ import Foundation
 class AuthViewModel: ObservableObject {
     @Published var isAuthenticated = false
     @Published var isLoading = false
-    @Published var error: AuthenticationError?
+    @Published var error: Error?
     
     func login(username: String, password: String) async {
         isLoading = true
@@ -21,17 +21,8 @@ class AuthViewModel: ObservableObject {
             let response = try await APIClient.shared.login(username: username, password: password)
             AppState.shared.currentUser = response.user
             isAuthenticated = true
-        } catch let apiError as APIError {
-            switch apiError {
-            case .unauthorized:
-                error = .invalidCredentials
-            case .networkError:
-                error = .networkError
-            default:
-                error = .unknown
-            }
         } catch {
-            self.error = .unknown
+            self.error = error
         }
         
         isLoading = false
@@ -45,17 +36,8 @@ class AuthViewModel: ObservableObject {
             let response = try await APIClient.shared.register(username: username, password: password)
             AppState.shared.currentUser = response.user
             isAuthenticated = true
-        } catch let apiError as APIError {
-            switch apiError {
-            case .serverError(let message):
-                error = .registrationFailed(message: message)
-            case .networkError:
-                error = .networkError
-            default:
-                error = .unknown
-            }
         } catch {
-            self.error = .unknown
+            self.error = error
         }
         
         isLoading = false
@@ -72,6 +54,7 @@ class AuthViewModel: ObservableObject {
             // Even if logout fails, we'll clear local state
             AppState.shared.currentUser = nil
             isAuthenticated = false
+            self.error = error
         }
         
         isLoading = false

@@ -1,3 +1,4 @@
+// seed.js
 const connectDB = require('./config/database');
 const Artist = require('./models/Artist');
 
@@ -11,17 +12,20 @@ const seedArtists = async () => {
             {
                 name: 'Bad Bunny',
                 genre: 'Latin Pop',
-                stage: 'coachella'
+                stage: 'coachella',
+                imageURL: null
             },
             {
                 name: 'Blur',
                 genre: 'Rock',
-                stage: 'outdoor'
+                stage: 'outdoor',
+                imageURL: null
             },
             {
                 name: 'Lana Del Rey',
                 genre: 'Pop',
-                stage: 'coachella'
+                stage: 'coachella',
+                imageURL: null
             }
         ]);
         
