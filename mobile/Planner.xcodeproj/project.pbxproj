@@ -16,6 +16,12 @@
 			path = Planner;
 			sourceTree = "<group>";
 		};
+		8EAE41352D3499E80055E2FE /* server */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = server;
+			path = ../server;
+			sourceTree = SOURCE_ROOT;
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +38,7 @@
 		8EAE2BA82D3477C90055E2FE = {
 			isa = PBXGroup;
 			children = (
+				8EAE41352D3499E80055E2FE /* server */,
 				8EAE2BB32D3477C90055E2FE /* Planner */,
 				8EAE2BB22D3477C90055E2FE /* Products */,
 			);
@@ -62,6 +69,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				8EAE2BB32D3477C90055E2FE /* Planner */,
+				8EAE41352D3499E80055E2FE /* server */,
 			);
 			name = Planner;
 			packageProductDependencies = (
