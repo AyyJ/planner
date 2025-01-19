@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const connectDB = require('./config/database');
 const User = require('./models/User');
 const Artist = require('./models/Artist');
+const cors = require('cors');
+
 
 const app = express();
 const port = 3000;
@@ -13,6 +15,7 @@ const port = 3000;
 // Connect to MongoDB
 connectDB();
 
+app.use(cors());
 app.use(bodyParser.json());
 
 // JWT Secret (in production, this should be in environment variables)

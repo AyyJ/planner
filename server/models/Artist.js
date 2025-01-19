@@ -1,3 +1,4 @@
+// models/Artist.js
 const mongoose = require('mongoose');
 
 const artistSchema = new mongoose.Schema({
@@ -6,21 +7,15 @@ const artistSchema = new mongoose.Schema({
         required: true
     },
     imageURL: String,
-    genre: String,
+    genre: {
+        type: String,
+        required: true
+    },
     stage: {
         type: String,
-        enum: ['coachella', 'outdoor', 'sahara', 'mojave', 'gobi', 'yuma', 'sonora']
-    },
-    schedule: {
-        startTime: Date,
-        endTime: Date,
-        day: {
-            type: String,
-            enum: ['friday', 'saturday', 'sunday']
-        }
+        enum: ['coachella', 'outdoor', 'sahara', 'mojave', 'gobi', 'yuma', 'sonora', 'quasar'],
+        required: true
     }
-}, {
-    timestamps: true
 });
 
 module.exports = mongoose.model('Artist', artistSchema);
