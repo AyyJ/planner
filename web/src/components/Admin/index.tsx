@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2, X, Save, Shield, UserPlus } from 'lucide-react';
+import { Edit2, Trash2, X, Save, Shield, UserPlus, Users } from 'lucide-react';
 
 interface User {
   _id: string;
@@ -18,12 +18,89 @@ interface EditingUser {
   isAdmin: boolean;
 }
 
+interface FriendsModalProps {
+  user: User;
+  allUsers: User[];
+  onClose: () => void;
+  onSave: (userId: string, friendIds: string[]) => Promise<void>;
+}
+
+const FriendsModal: React.FC<FriendsModalProps> = ({ user, allUsers, onClose, onSave }) => {
+  const [selectedFriends, setSelectedFriends] = useState<Set<string>>(
+    new Set(user.friends.map(f => f._id))
+  );
+
+  const handleToggleFriend = (friendId: string) => {
+    const newSelection = new Set(selectedFriends);
+    if (newSelection.has(friendId)) {
+      newSelection.delete(friendId);
+    } else {
+      newSelection.add(friendId);
+    }
+    setSelectedFriends(newSelection);
+  };
+
+  const handleSave = async () => {
+    await onSave(user._id, Array.from(selectedFriends));
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-md rounded-lg bg-neutral-800 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-white">
+            Manage Friends for {user.username}
+          </h2>
+          <button
+            onClick={onClose}
+            className="rounded p-1 hover:bg-neutral-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="max-h-96 overflow-y-auto">
+          {allUsers
+            .filter(potentialFriend => potentialFriend._id !== user._id)
+            .map(potentialFriend => (
+              <label
+                key={potentialFriend._id}
+                className="flex cursor-pointer items-center space-x-3 rounded p-2 hover:bg-neutral-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedFriends.has(potentialFriend._id)}
+                  onChange={() => handleToggleFriend(potentialFriend._id)}
+                  className="h-4 w-4 rounded border-neutral-600"
+                />
+                <span className="text-neutral-200">{potentialFriend.username}</span>
+                {potentialFriend.isAdmin && (
+                  <Shield className="h-4 w-4 text-teal-400" />
+                )}
+              </label>
+            ))}
+        </div>
+
+        <button
+          onClick={handleSave}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-teal-600 px-4 py-2 font-medium text-white hover:bg-teal-700"
+        >
+          <Save className="h-4 w-4" />
+          Save Changes
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<EditingUser | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [managingFriendsFor, setManagingFriendsFor] = useState<User | null>(null);
 
   // Get current admin's ID from localStorage
   const currentAdminId = JSON.parse(localStorage.getItem('user') || '{}')._id;
@@ -75,29 +152,20 @@ export const AdminPanel: React.FC = () => {
     if (!editingUser) return;
 
     try {
-      if (isCreating) {
-        const response = await fetch('http://localhost:5003/api/admin/users', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify(editingUser)
-        });
+      const endpoint = isCreating 
+        ? 'http://localhost:5003/api/admin/users'
+        : `http://localhost:5003/api/admin/users/${editingUser._id}`;
 
-        if (!response.ok) throw new Error('Failed to create user');
-      } else {
-        const response = await fetch(`http://localhost:5003/api/admin/users/${editingUser._id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify(editingUser)
-        });
+      const response = await fetch(endpoint, {
+        method: isCreating ? 'POST' : 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(editingUser)
+      });
 
-        if (!response.ok) throw new Error('Failed to update user');
-      }
+      if (!response.ok) throw new Error(isCreating ? 'Failed to create user' : 'Failed to update user');
       
       await fetchUsers();
       setEditingUser(null);
@@ -128,6 +196,24 @@ export const AdminPanel: React.FC = () => {
       await fetchUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete user');
+    }
+  };
+
+  const handleSaveFriends = async (userId: string, friendIds: string[]) => {
+    try {
+      const response = await fetch(`http://localhost:5003/api/admin/users/${userId}/friends`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ friendIds })
+      });
+
+      if (!response.ok) throw new Error('Failed to update friends');
+      await fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update friends');
     }
   };
 
@@ -192,12 +278,21 @@ export const AdminPanel: React.FC = () => {
                       <button
                         onClick={() => handleEdit(user)}
                         className="rounded p-1 hover:bg-neutral-700"
+                        title="Edit User"
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button
+                        onClick={() => setManagingFriendsFor(user)}
+                        className="rounded p-1 hover:bg-neutral-700"
+                        title="Manage Friends"
+                      >
+                        <Users className="h-4 w-4 text-teal-400" />
+                      </button>
+                      <button
                         onClick={() => handleDelete(user._id)}
                         className="rounded p-1 hover:bg-neutral-700"
+                        title="Delete User"
                       >
                         <Trash2 className="h-4 w-4 text-red-400" />
                       </button>
@@ -289,6 +384,15 @@ export const AdminPanel: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {managingFriendsFor && (
+          <FriendsModal
+            user={managingFriendsFor}
+            allUsers={users}
+            onClose={() => setManagingFriendsFor(null)}
+            onSave={handleSaveFriends}
+          />
         )}
       </div>
     </div>
